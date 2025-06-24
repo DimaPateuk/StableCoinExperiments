@@ -57,6 +57,30 @@ contract StableCoinExperiments is Ownable {
         }
     }
 
+    function getPotentialSwapInfoByAmountV2(
+        uint256 amountIn,
+        bool firstToSecond
+    ) external view returns (uint256, uint256, address[] memory) {
+        address[] memory path = new address[](2);
+
+        if (firstToSecond) {
+            path[0] = TOKEN_FIRST;
+            path[1] = TOKEN_SECOND;
+        } else {
+            path[0] = TOKEN_SECOND;
+            path[1] = TOKEN_FIRST;
+        }
+
+        if (amountIn == 0) {
+            return (0, 0, path);
+        }
+
+        uint256[] memory amountsOut = router.getAmountsOut(amountIn, path);
+        uint256 amountOut = amountsOut[1];
+
+        return (amountIn, amountOut, path);
+    }
+
     function getPotentialSwapInfoV2()
         external
         view
@@ -136,5 +160,20 @@ contract StableCoinExperiments is Ownable {
 
     function testValue() external pure returns (uint256) {
         return 42;
+    }
+
+    function withdrawToken(
+        address token,
+        uint256 amount,
+        address to
+    ) external onlyOwner {
+        require(to != address(0), "Invalid recipient");
+        require(
+            IERC20(token).balanceOf(address(this)) >= amount,
+            "Insufficient balance"
+        );
+
+        bool success = IERC20(token).transfer(to, amount);
+        require(success, "Token transfer failed");
     }
 }
