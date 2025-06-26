@@ -10,11 +10,16 @@ const USDC = ethers.getAddress("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48");
 const UNISWAP_V2_ROUTER = ethers.getAddress(
   "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
 );
+const UNISWAP_V3_ROUTER = ethers.getAddress(
+  "0xe592427a0aece92de3edee1f18e0157c05861564"
+);
+const UNISWAP_V3_QUOTER = ethers.getAddress(
+  "0xb27308f9f90d607463bb33ea1bebb41c27ce5ab6"
+);
 const USDT_WHALE = ethers.getAddress(
   "0x7055b17a1b911b6b971172c01ff0cc27881aea94"
 );
 
-// NOTE: You must configure your mainnet RPC in .env
 const RPC = process.env.MAINNET_RPC_URL || "";
 
 describe("StableCoinExperiments", function () {
@@ -48,7 +53,13 @@ describe("StableCoinExperiments", function () {
     const ContractFactory = await ethers.getContractFactory(
       "StableCoinExperiments"
     );
-    contract = await ContractFactory.deploy(USDT, USDC, UNISWAP_V2_ROUTER);
+    contract = await ContractFactory.deploy(
+      USDT,
+      USDC,
+      UNISWAP_V2_ROUTER,
+      UNISWAP_V3_ROUTER,
+      UNISWAP_V3_QUOTER
+    );
     await contract.waitForDeployment();
 
     usdt = await ethers.getContractAt("IERC20", USDT);
@@ -61,74 +72,108 @@ describe("StableCoinExperiments", function () {
       .transfer(await contract.getAddress(), 1000n);
   });
 
-  describe("swaps v2", () => {
-    it("should return USDT and USDC balances", async () => {
-      const [usdtBalance, usdcBalance] = await contract.getTokenBalances();
-      expect(usdtBalance).to.be.gt(0);
-      expect(usdcBalance).to.equal(0);
-    });
+  it("should return USDT and USDC balances", async () => {
+    const [usdtBalance, usdcBalance] = await contract.getTokenBalances();
+    expect(usdtBalance).to.be.gt(0);
+    expect(usdcBalance).to.equal(0);
+  });
 
+  describe("swaps v2", () => {
     it("should return potential swap info", async () => {
-      try {
+      const [amountIn, amountOut, path] =
         await contract.getPotentialSwapInfoV2();
-      } catch (error) {
-        expect((error as Error).message).to.include("No profit");
-      }
+
+      expect(amountIn).to.be.a("bigint");
+      expect(amountOut).to.be.a("bigint");
+      expect(path.join(",")).to.be.equal(`${USDT},${USDC}`);
     });
 
     it("should run doSwapV2 and decide direction", async () => {
       try {
         await contract.doSwapV2();
-        expect(1).equal(2);
+        expect.fail("Expected to throw");
       } catch (error) {
         expect((error as Error).message).to.include("No profit");
       }
     });
 
-    describe("getPotentialSwapInfoByAmountV2", () => {
-      it("should return correct swap info from TOKEN_FIRST to TOKEN_SECOND", async () => {
-        const inputAmount = ethers.parseUnits("100", 6);
-        const [amountIn, amountOut, path] =
-          await contract.getPotentialSwapInfoByAmountV2(inputAmount, true);
+    it("should return correct swap info from TOKEN_FIRST to TOKEN_SECOND", async () => {
+      const inputAmount = ethers.parseUnits("100", 6);
+      const [amountIn, amountOut, path] =
+        await contract.getPotentialSwapInfoByAmountV2(inputAmount, true);
 
-        expect(amountIn).to.equal(inputAmount);
-        expect(amountOut).to.be.gt(0);
-        expect(path[0]).to.equal(USDT);
-        expect(path[1]).to.equal(USDC);
-      });
-
-      it("should return correct swap info from TOKEN_SECOND to TOKEN_FIRST", async () => {
-        const inputAmount = ethers.parseUnits("100", 6);
-        const [amountIn, amountOut, path] =
-          await contract.getPotentialSwapInfoByAmountV2(inputAmount, false);
-
-        expect(amountIn).to.equal(inputAmount);
-        expect(amountOut).to.be.gt(0);
-        expect(path[0]).to.equal(USDC);
-        expect(path[1]).to.equal(USDT);
-      });
-
-      it("should return zero output for zero input", async () => {
-        const inputAmount = 0;
-        const [amountIn, amountOut, path] =
-          await contract.getPotentialSwapInfoByAmountV2(inputAmount, true);
-
-        expect(amountIn).to.equal(0);
-        expect(amountOut).to.equal(0);
-        expect(path.length).to.equal(2);
-      });
+      expect(amountIn).to.equal(inputAmount);
+      expect(amountOut).to.be.gt(0);
+      expect(path[0]).to.equal(USDT);
+      expect(path[1]).to.equal(USDC);
     });
 
-    describe("Swap Failure Scenarios", () => {
-      it("should revert swap if no profit", async () => {
-        const [owner] = await ethers.getSigners();
+    it("should return correct swap info from TOKEN_SECOND to TOKEN_FIRST", async () => {
+      const inputAmount = ethers.parseUnits("100", 6);
+      const [amountIn, amountOut, path] =
+        await contract.getPotentialSwapInfoByAmountV2(inputAmount, false);
 
-        // Ensure router returns same or less than amountIn
-        // Usually this would require mocking the router
-        await expect(contract.doSwapV2()).to.be.revertedWith(
-          "No profit: output <= input"
+      expect(amountIn).to.equal(inputAmount);
+      expect(amountOut).to.be.gt(0);
+      expect(path[0]).to.equal(USDC);
+      expect(path[1]).to.equal(USDT);
+    });
+
+    it("should return zero output for zero input", async () => {
+      const inputAmount = 0;
+      const [amountIn, amountOut, path] =
+        await contract.getPotentialSwapInfoByAmountV2(inputAmount, true);
+
+      expect(amountIn).to.equal(0);
+      expect(amountOut).to.equal(0);
+      expect(path.length).to.equal(2);
+    });
+
+    it("should revert swap if no profit", async () => {
+      const [owner] = await ethers.getSigners();
+
+      // Ensure router returns same or less than amountIn
+      // Usually this would require mocking the router
+      await expect(contract.doSwapV2()).to.be.revertedWith(
+        "No profit: output <= input"
+      );
+    });
+  });
+
+  describe("swaps v3", () => {
+    const FEE = 500;
+
+    it("should return potential swap info from TOKEN_FIRST to TOKEN_SECOND", async () => {
+      const inputAmount = ethers.parseUnits("100", 6);
+      const amountOut =
+        await contract.getPotentialSwapInfoByAmountV3.staticCall(
+          inputAmount,
+          true,
+          FEE
         );
-      });
+
+      expect(amountOut).to.be.gt(0);
+    });
+
+    it("should return potential swap info from TOKEN_SECOND to TOKEN_FIRST", async () => {
+      const inputAmount = ethers.parseUnits("100", 6);
+      const amountOut =
+        await contract.getPotentialSwapInfoByAmountV3.staticCall(
+          inputAmount,
+          false,
+          FEE
+        );
+
+      expect(amountOut).to.be.gt(0);
+    });
+
+    it("should fail to swap TOKEN_FIRST to TOKEN_SECOND if not profitable", async () => {
+      try {
+        await contract.swapTokenFirstToSecondV3(FEE);
+        expect.fail("Expected to throw");
+      } catch (error) {
+        expect((error as Error).message).to.include("No profit");
+      }
     });
   });
 

@@ -3,18 +3,59 @@ pragma solidity ^0.8.26;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./UniswapV2Helper.sol";
+import "./UniswapV3Helper.sol";
 
-contract StableCoinExperiments is Ownable, UniswapV2Helper {
+interface IQuoterRoot {
+    function quoteExactInputSingle(
+        address tokenIn,
+        address tokenOut,
+        uint24 fee,
+        uint256 amountIn,
+        uint160 sqrtPriceLimitX96
+    ) external returns (uint256 amountOut);
+}
+
+contract StableCoinExperiments is Ownable, UniswapV2Helper, UniswapV3Helper {
     address public TOKEN_FIRST;
     address public TOKEN_SECOND;
+    address public _quoterRootV3;
 
     constructor(
         address _tokenFirst,
         address _tokenSecond,
-        address _router
-    ) Ownable(msg.sender) UniswapV2Helper(_router) {
+        address _routerV2,
+        address _routerV3,
+        address _quoterV3
+    )
+        Ownable(msg.sender)
+        UniswapV2Helper(_routerV2)
+        UniswapV3Helper(_routerV3, _quoterV3)
+    {
         TOKEN_FIRST = _tokenFirst;
         TOKEN_SECOND = _tokenSecond;
+        _quoterRootV3 = _quoterV3;
+    }
+
+    function theMethod(
+        address tokenIn,
+        address tokenOut,
+        uint24 fee,
+        uint256 amountIn
+    ) external returns (uint256 amountOut) {
+        if (amountIn == 0) return 0;
+
+        console.log("tokenIn:", tokenIn);
+        console.log("tokenOut:", tokenOut);
+        console.log("fee:", fee);
+        console.log("amountIn:", amountIn);
+        amountOut = 0;
+        amountOut = IQuoterRoot(_quoterRootV3).quoteExactInputSingle(
+            tokenIn,
+            tokenOut,
+            fee,
+            amountIn,
+            0 // no price limit
+        );
     }
 
     function doSwapV2() external onlyOwner {
@@ -40,6 +81,38 @@ contract StableCoinExperiments is Ownable, UniswapV2Helper {
         returns (uint256 amountIn, uint256 amountOut, address[] memory path)
     {
         return _getPotentialSwapInfoV2(TOKEN_FIRST, TOKEN_SECOND);
+    }
+
+    function swapTokenFirstToSecondV3(uint24 fee) external onlyOwner {
+        _swapExactTokensForTokensV3(TOKEN_FIRST, TOKEN_SECOND, fee);
+    }
+
+    function swapTokenSecondToFirstV3(uint24 fee) external onlyOwner {
+        _swapExactTokensForTokensV3(TOKEN_SECOND, TOKEN_FIRST, fee);
+    }
+
+    function getPotentialSwapInfoByAmountV3(
+        uint256 amountIn,
+        bool firstToSecond,
+        uint24 fee
+    ) external returns (uint256 amountOut) {
+        if (firstToSecond) {
+            return
+                _getPotentialSwapInfoByAmountV3(
+                    TOKEN_FIRST,
+                    TOKEN_SECOND,
+                    fee,
+                    amountIn
+                );
+        } else {
+            return
+                _getPotentialSwapInfoByAmountV3(
+                    TOKEN_SECOND,
+                    TOKEN_FIRST,
+                    fee,
+                    amountIn
+                );
+        }
     }
 
     function getTokenBalances()
