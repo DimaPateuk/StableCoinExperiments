@@ -1,13 +1,5 @@
-# Sample Hardhat Project
+# This project still in progress, so far lack of ideas...
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a Hardhat Ignition module that deploys that contract.
+## The project showcases a basic DeFi trading bot concept using Solidity, Hardhat, and TypeScript — specifically
 
-Try running some of the following tasks:
-
-```shell
-npx hardhat help
-npx hardhat test
-REPORT_GAS=true npx hardhat test
-npx hardhat node
-npx hardhat ignition deploy ./ignition/modules/Lock.ts
-```
+The project uses only uniswap v2 maybe v3 later.
