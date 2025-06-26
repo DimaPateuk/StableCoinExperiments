@@ -5,16 +5,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "./UniswapV2Helper.sol";
 import "./UniswapV3Helper.sol";
 
-interface IQuoterRoot {
-    function quoteExactInputSingle(
-        address tokenIn,
-        address tokenOut,
-        uint24 fee,
-        uint256 amountIn,
-        uint160 sqrtPriceLimitX96
-    ) external returns (uint256 amountOut);
-}
-
 contract StableCoinExperiments is Ownable, UniswapV2Helper, UniswapV3Helper {
     address public TOKEN_FIRST;
     address public TOKEN_SECOND;
@@ -34,28 +24,6 @@ contract StableCoinExperiments is Ownable, UniswapV2Helper, UniswapV3Helper {
         TOKEN_FIRST = _tokenFirst;
         TOKEN_SECOND = _tokenSecond;
         _quoterRootV3 = _quoterV3;
-    }
-
-    function theMethod(
-        address tokenIn,
-        address tokenOut,
-        uint24 fee,
-        uint256 amountIn
-    ) external returns (uint256 amountOut) {
-        if (amountIn == 0) return 0;
-
-        console.log("tokenIn:", tokenIn);
-        console.log("tokenOut:", tokenOut);
-        console.log("fee:", fee);
-        console.log("amountIn:", amountIn);
-        amountOut = 0;
-        amountOut = IQuoterRoot(_quoterRootV3).quoteExactInputSingle(
-            tokenIn,
-            tokenOut,
-            fee,
-            amountIn,
-            0 // no price limit
-        );
     }
 
     function doSwapV2() external onlyOwner {
